@@ -1,0 +1,27 @@
+services:
+  ohip:
+    build: .
+    ports:
+      - "8091:8080"
+    environment:
+      APP_LOGIN_EMAIL: "alex@ad-consultingservices.com"
+      APP_LOGIN_PASSWORD: "28993210p!"
+      # Recommended: env-only mode for containers
+      ENV_ONLY: "1"
+      LOG_STDOUT: "1"
+      NO_FILE_WRITES: "1"
+
+      # --- Required OHIP vars ---
+      OHIP_BASE_URL: "https://mtce10ua.hospitality-api.eu-frankfurt-1.ocs.oc-test.com"
+      OHIP_TOKEN_PATH: "/oauth/v1/tokens"
+      OHIP_CLIENT_ID: ""
+      OHIP_CLIENT_SECRET: ""
+      OHIP_APP_KEY: ""
+      OHIP_HOTEL_ID: "CHR"
+      OHIP_ENTERPRISE_HEADER: "enterpriseId"
+      OHIP_ENTERPRISE_ID: "BHE"
+      OHIP_SCOPE: "urn:opc:hgbu:ws:__myscopes__"
+
+      # Optional
+      DEBUG: "0"
+      TZ: "UTC"
