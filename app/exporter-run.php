@@ -1,3 +1,4 @@
+
 <?php
 declare(strict_types=1);
 
@@ -143,6 +144,59 @@ function search_page_items_count(mixed $body): int
 function top_level_keys(mixed $body): array
 {
     return is_array($body) ? array_keys($body) : [];
+}
+
+function extract_external_reference_values(mixed $body): array
+{
+    $result = [
+        'ERP' => '',
+        'IMPORTCNF' => '',
+    ];
+
+    if (!is_array($body)) {
+        return $result;
+    }
+
+    $candidates = [];
+
+    if (isset($body['externalReferences']) && is_array($body['externalReferences'])) {
+        $candidates[] = $body['externalReferences'];
+    }
+
+    if (
+        isset($body['reservations']['reservation'][0]['externalReferences']) &&
+        is_array($body['reservations']['reservation'][0]['externalReferences'])
+    ) {
+        $candidates[] = $body['reservations']['reservation'][0]['externalReferences'];
+    }
+
+    if (
+        isset($body['reservations']['reservationInfo'][0]['externalReferences']) &&
+        is_array($body['reservations']['reservationInfo'][0]['externalReferences'])
+    ) {
+        $candidates[] = $body['reservations']['reservationInfo'][0]['externalReferences'];
+    }
+
+    foreach ($candidates as $refs) {
+        foreach ($refs as $ref) {
+            if (!is_array($ref)) {
+                continue;
+            }
+
+            $ctx = (string)($ref['idContext'] ?? '');
+            $id = (string)($ref['id'] ?? '');
+
+            if ($ctx === 'ERP' && $result['ERP'] === '') {
+                $result['ERP'] = $id;
+            }
+
+            if ($ctx === 'IMPORTCNF' && $result['IMPORTCNF'] === '') {
+                $result['IMPORTCNF'] = $id;
+            }
+        }
+    }
+
+    return $result;
 }
 
 function state_payload(array $state, string $message): array
@@ -346,28 +400,13 @@ if (isset($_GET['step'])) {
             $path = "/rsv/v1/hotels/" . rawurlencode($hotelId) . "/reservations/" . rawurlencode($reservationId);
             $response = $client->callJson('GET', $path, null);
             $body = $response['body'] ?? [];
-            $refs = is_array($body) ? ($body['externalReferences'] ?? []) : [];
+            $refs = extract_external_reference_values($body);
 
-            $erp = '';
-            $importCnf = '';
-
-            if (is_array($refs)) {
-                foreach ($refs as $ref) {
-                    if (!is_array($ref)) {
-                        continue;
-                    }
-
-                    if (($ref['idContext'] ?? '') === 'ERP') {
-                        $erp = (string)($ref['id'] ?? '');
-                    }
-
-                    if (($ref['idContext'] ?? '') === 'IMPORTCNF') {
-                        $importCnf = (string)($ref['id'] ?? '');
-                    }
-                }
-            }
-
-            $rows[] = [$reservationId, $erp, $importCnf];
+            $rows[] = [
+                $reservationId,
+                $refs['ERP'],
+                $refs['IMPORTCNF'],
+            ];
             $successCount++;
         } catch (Throwable $e) {
             $failedCount++;
@@ -413,19 +452,19 @@ if (isset($_GET['download'])) {
 
     if (count($rows) > 0) {
         header('Content-Disposition: attachment; filename=external_references_completed.csv');
-        fputcsv($out, ['reservationId', 'ERP', 'IMPORTCNF']);
+        fputcsv($out, ['reservationId', 'ERP', 'IMPORTCNF'], ',', '"', '\\');
 
         foreach ($rows as $row) {
             if (is_array($row)) {
-                fputcsv($out, $row);
+                fputcsv($out, $row, ',', '"', '\\');
             }
         }
     } else {
         header('Content-Disposition: attachment; filename=discovered_reservation_ids.csv');
-        fputcsv($out, ['reservationId']);
+        fputcsv($out, ['reservationId'], ',', '"', '\\');
 
         foreach ($ids as $id) {
-            fputcsv($out, [$id]);
+            fputcsv($out, [$id], ',', '"', '\\');
         }
     }
 
